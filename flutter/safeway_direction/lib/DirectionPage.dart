@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'PlaceInfo.dart';
 import 'package:location/location.dart';
+import 'package:geolocator/geolocator.dart' as geo;
 
 final String apiKEY = "AIzaSyArqnmN1rdVusSOjatWg7n-Y4M37x6Y7wU";
 
@@ -29,6 +30,10 @@ class DirectionPageState extends State<DirectionPage> {
   List<Marker> markers = [];
   List<DirectionClass> directionList = [DirectionClass(distance: '10',time: '30'),DirectionClass(distance: '5',time: '15'),DirectionClass(distance: '15',time:'45')];
   Set<Polyline> polylines;
+  Set<Marker> _markers = {};
+  List<BitmapDescriptor> locationIcon = List<BitmapDescriptor>(3); // 현재 위치 표시하는 icon list
+
+
   final CameraPosition _initialCamera = CameraPosition(
     target: LatLng(37.569758,126.977022),
     zoom: 14.0000,
@@ -38,6 +43,27 @@ class DirectionPageState extends State<DirectionPage> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    location = new Location();
+    location.onLocationChanged.listen((LocationData cLoc) {
+      currentLocation = cLoc;
+      updatePinOnMap(cLoc);
+    });
+
+    BitmapDescriptor.fromAssetImage(ImageConfiguration(devicePixelRatio: 2.5),
+    'image/currentLocation1.png')
+        .then((onValue) {
+    locationIcon[0] = onValue;
+    });
+    BitmapDescriptor.fromAssetImage(ImageConfiguration(devicePixelRatio: 2.5),
+    'image/currentLocation2.png')
+        .then((onValue) {
+    locationIcon[1] = onValue;
+    });
+    BitmapDescriptor.fromAssetImage(ImageConfiguration(devicePixelRatio: 2.5),
+    'image/currentLocation3.png')
+        .then((onValue) {
+    locationIcon[2] = onValue;
+    });
   }
 
   @override
@@ -54,6 +80,7 @@ class DirectionPageState extends State<DirectionPage> {
             zoomControlsEnabled: false,
             mapType: MapType.normal,
             initialCameraPosition: _initialCamera,
+            markers: _markers,
             onMapCreated: (GoogleMapController controller) {
               _mapController.complete(controller);
             },
@@ -94,7 +121,24 @@ class DirectionPageState extends State<DirectionPage> {
           Positioned(
             bottom: 150,
             right: 20,
-            child: FloatingActionButton(child: Icon(Icons.gps_fixed,color: Colors.black,),backgroundColor: Colors.white,),
+            child: FloatingActionButton(
+                child: Icon(
+                  Icons.gps_fixed,
+                  color: Colors.black,
+                ),
+                backgroundColor: Colors.white,
+                onPressed: () async {
+                  geo.Position currentLocation = await geo.Geolocator()
+                      .getLastKnownPosition(
+                      desiredAccuracy: geo.LocationAccuracy.high);
+                  final GoogleMapController controller =
+                  await _mapController.future;
+                  controller.animateCamera(CameraUpdate.newCameraPosition(
+                      CameraPosition(
+                          target: LatLng(currentLocation.latitude,
+                              currentLocation.longitude),
+                          zoom: 15.500)));
+                }),
           ),
           Positioned(
               bottom: 30,
@@ -110,6 +154,19 @@ class DirectionPageState extends State<DirectionPage> {
         ],
       ),
     );
+  }
+
+  // 위치 변경 될 경우 화면에 다시 표시함.
+  Future<void> updatePinOnMap(LocationData location) async {
+    final GoogleMapController controller = await _mapController.future;
+    setState(() {
+      _markers.removeWhere((m) => m.markerId.value == 'sourcePin');
+      _markers.add(Marker(
+          markerId: MarkerId('sourcePin'),
+          position:
+          LatLng(location.latitude, location.longitude), // updated position
+          icon: locationIcon[0]));
+    });
   }
 }
 
